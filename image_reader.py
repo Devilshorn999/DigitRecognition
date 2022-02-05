@@ -6,10 +6,12 @@ import argparse
 
 import tensorflow as tf
 from tensorflow.keras.models import load_model
+import tkinter as tk
+from tkinter import messagebox
 
 
 '''
-This is for running on command line
+This is for running on command line.
 '''
 
 def statement(stmnt):
@@ -22,6 +24,7 @@ parser = argparse.ArgumentParser(description='Behavioral Cloning Training Progra
 parser.add_argument('-m', '-model', help='Select your model. for model with 2 dense layer - 1 , for model with 1 dense layer - 2'.title(), dest='model', type=int, default=1, choices=[1,2])
 parser.add_argument('-f', '-file', help='file path of the image or video'.title(), dest='file_path', type=str, default='./myImage/2022-02-03-12-20-54.mp4')
 parser.add_argument('-s', '-speed', help='Frame Read Speed'.title(), dest='frame_speed', type=int, default=1)
+parser.add_argument('-w', '-cam', help='open web cam'.title(), dest='webcam', type=int, default=0, choices=[0,1])
 args = parser.parse_args()
 
 print('-' * 30)
@@ -81,27 +84,86 @@ def predict(model, file, frame_speed):
                     break
         vid.release()
         cv2.destroyAllWindows()
-        return preds
     
     elif ext.lower() in 'png,jpeg,tiff,psd,xcf,ai,cdr,tif,bmp,jpg,eps,raw,cr2,nef,orf,sr2'.split(','):
         img = cv2.imread(file)
-        plt.imshow(img)
-        plt.show()
         img = cv2.cvtColor(img,cv2.COLOR_BGR2GRAY)
-        plt.imshow(img)
-        plt.show()
         img = cv2.resize(img,(28,28),interpolation=cv2.INTER_AREA)
-        plt.imshow(img)
         img = tf.keras.utils.normalize(img)
         img = np.array(img).reshape(-1,28,28,1)
         pred = model.predict(img)
         print('the model identified the digit in the image as'.title(),end='')
+        pred = np.argmax(pred)
         statement(np.argmax(pred))
+        # messagebox.showinfo("showinfo", f'The Digit in the picture is {pred}')
+
+def open_cam():
+    print('Initializing cam')
+    for i in range(4):
+        cam = cv2.VideoCapture(i)
+        if cam.isOpened():
+            cam.set(3,640)
+            cam.set(4,480)
+            while True:
+                ret, frame = cam.read()
+                img = np.asarray(frame)
+                img = cv2.resize(img,(280,280))
+                img = cv2.cvtColor(img,cv2.COLOR_BGR2GRAY)
+                # cv2.imshow('video',img)
+                img = cv2.equalizeHist(img)
+                img = tf.keras.utils.normalize(img)
+                img = cv2.resize(img,(28,28))
+                # cv2.imshow('video1',img)
+                img = img.reshape(1,28,28,1)
+                prob = model.predict(img)
+                class_ = np.argmax(prob)
+                prob = round(prob[0][class_]*100,2)
+                try:
+                    print(class_,'-',prob)
+                    if prob>30:
+                        cv2.putText(frame,
+                                    str(class_) + ' ' + str(prob),
+                                    (5,30),
+                                    cv2.FONT_HERSHEY_SCRIPT_SIMPLEX,
+                                   1,(0,255,0),2)
+                    cv2.putText(frame,
+                                ' '*63+'Press q to exit',
+                                (5,20),
+                                cv2.FONT_ITALIC,
+                               0.5,(0,0,255),1)
+                except IndexError:
+                    continue
+                cv2.imshow('      Camera', frame)
+                if cv2.waitKey(1) & 0xFF == ord('q'):
+                    break
+            cam.release()
+        else:
+            stmnt = f'No Camera connected'.title()
+            root = tk.Tk()
+            root.withdraw()
+            message = messagebox.showinfo('Error'.title(),stmnt)
+            root.destroy()
+            continue
+        stmnt = '''
+            Exiting Camera.
+            '''
+        root = tk.Tk()
+        root.withdraw()
+        message = messagebox.showinfo('success'.title(),stmnt)
+        root.destroy()
+        cv2.destroyAllWindows()
+        break
 
 
 if args.model == 1:
     statement('2 dense layer model enabled')
-    predict(model, args.file_path, args.frame_speed)
+    if args.webcam == 0:
+        predict(model, args.file_path, args.frame_speed)
+    else:
+        open_cam()
 else:
-    statement('1 dense layer model enabled')
-    predict(model1, args.file_path, args.frame_speed)
+    statement('2 dense layer model enabled')
+    if args.webcam == 0:
+        predict(model, args.file_path, args.frame_speed)
+    else:
+        open_cam()

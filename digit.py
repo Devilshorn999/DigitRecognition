@@ -10,18 +10,18 @@ import tkinter as tk
 import win32gui
 from PIL import ImageGrab, Image
 from tkinter import messagebox
-# import tensorflow.python.keras.engine
+import tensorflow.python.keras.engine
 import os
 
 
 def statement(stmnt):
     print(Fore.YELLOW, Back.LIGHTBLACK_EX, Style.BRIGHT, stmnt, Style.RESET_ALL)
 
-# model = load_model('./Digit Identification/model')
 # model1 = load_model('./Digit Identification/tkinter_model')
+# model = load_model('./Digit Identification/model')
 
+# model1 = load_model('tkinter_model')
 model = load_model('model')
-model1 = load_model('tkinter_model')
 
 def predict(model, file, frame_speed):
     preds = []
@@ -103,7 +103,63 @@ def open_file(speed):
             for i in ls:
                 stmnt+=str(i)+' '*3
             messagebox.showinfo('success'.title(),stmnt)
-                
+
+def open_cam():
+    print('Initializing cam')
+    for i in range(4):
+        cam = cv2.VideoCapture(i)
+        if cam.isOpened():
+            cam.set(3,640)
+            cam.set(4,480)
+            while True:
+                ret, frame = cam.read()
+                img = np.asarray(frame)
+                img = cv2.resize(img,(280,280))
+                img = cv2.cvtColor(img,cv2.COLOR_BGR2GRAY)
+                # cv2.imshow('video',img)
+                img = cv2.equalizeHist(img)
+                img = tf.keras.utils.normalize(img)
+                img = cv2.resize(img,(28,28))
+                # cv2.imshow('video1',img)
+                img = img.reshape(1,28,28,1)
+                prob = model.predict(img)
+                class_ = np.argmax(prob)
+                prob = round(prob[0][class_]*100,2)
+                try:
+                    print(class_,'-',prob)
+                    if prob>30:
+                        cv2.putText(frame,
+                                    str(class_) + ' ' + str(prob),
+                                    (5,30),
+                                    cv2.FONT_HERSHEY_SCRIPT_SIMPLEX,
+                                   1,(0,255,0),2)
+                    cv2.putText(frame,
+                                ' '*63+'Press q to exit',
+                                (5,20),
+                                cv2.FONT_ITALIC,
+                               0.5,(0,0,255),1)
+                except IndexError:
+                    continue
+                cv2.imshow('      Camera', frame)
+                if cv2.waitKey(1) & 0xFF == ord('q'):
+                    break
+            cam.release()
+        else:
+            stmnt = f'No Camera connected'.title()
+            root = tk.Tk()
+            root.withdraw()
+            message = messagebox.showinfo('Error'.title(),stmnt)
+            root.destroy()
+            continue
+        stmnt = '''
+            Exiting Camera.
+            '''
+        root = tk.Tk()
+        root.withdraw()
+        message = messagebox.showinfo('success'.title(),stmnt)
+        root.destroy()
+        cv2.destroyAllWindows()
+        break
         
                 
 def predict_digit(file):
@@ -154,6 +210,7 @@ class App(tk.Tk):
         self.speed = Entry(self, textvariable=self.speed_var).place(x=410,y=450)
         self.button_open = tk.Button(self, text='open a picture or video instead'.title(), command=lambda:open_file(self.speed_var.get()) ).grid( row=3,column=0,pady=10, padx=2)
         self.label1 = Label(self, text='Video Frame Skips').place(x=300,y=450)
+        self.button_cam = Button(self,text='Open Camera',command=lambda:open_cam()).grid( row=4,columnspan=3,pady=10, padx=2)
 
 
     
